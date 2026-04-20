@@ -2,8 +2,8 @@
 
 import { useMemo, type ComponentType } from "react";
 import VirtualList from "@/components/VirtualList";
-import { generateMockData, FeedItem } from "@/utils/mock";
-import { ExampleItem } from "@/components/ExampleItem";
+import { generateMockData, FeedItem } from "@/components/VirtualList/mock";
+import { ExampleItem } from "@/components/VirtualList/ExampleItem";
 
 type VirtualListData = Record<string, unknown>;
 type VirtualListItemProps = Record<string, unknown>;

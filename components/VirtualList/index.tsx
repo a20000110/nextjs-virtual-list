@@ -9,14 +9,8 @@ import React, {
   useState,
 } from "react";
 import VirtualItem from "./Item";
+import type { Range } from "./types";
 import Virtual from "./virtual";
-
-interface Range {
-  start: number;
-  end: number;
-  padFront: number;
-  padBehind: number;
-}
 
 type DataSource = Record<string, unknown>;
 type ItemComponentProps = Record<string, unknown>;

@@ -1,9 +1,9 @@
 "use client";
 
-import VirtualList, { VirtualListRef } from "@/components/VirtualList";
+import VirtualList, { VirtualListRef } from "./index";
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
-import { FeedItem } from "@/utils/mock";
-import { ExampleItem } from "@/components/ExampleItem";
+import { FeedItem } from "./mock";
+import { ExampleItem } from "./ExampleItem";
 
 type VirtualListData = Record<string, unknown>;
 type VirtualListItemProps = Record<string, unknown>;

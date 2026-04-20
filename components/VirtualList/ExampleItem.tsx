@@ -1,6 +1,6 @@
 import React from "react";
 import Image from "next/image";
-import { FeedItem } from "@/utils/mock";
+import { FeedItem } from "./mock";
 import { RiHeartLine, RiChat1Line, RiShareForwardLine } from "@remixicon/react";
 
 interface ExampleItemProps {

@@ -4,8 +4,8 @@
  * @param {Object} param 定制参数
  * @param {Function} callUpdate 回调
  */
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
+import type { Range, RangeUpdateCallback, VirtualParam } from "./types";
+
 enum CalcType {
   INIT = "INIT",
   FIXED = "FIXED",
@@ -16,13 +16,21 @@ enum Direction {
   FRONT = "FRONT",
   BEHIND = "BEHIND",
 }
+
 export default class Virtual {
   sizes: Map<string, number> = new Map<string, number>(); // 存储元素的尺寸的Map对象
-  offset: number;
-  calcType: CalcType;
-  direction: Direction;
+  offset: number = 0;
+  calcType: CalcType = CalcType.INIT;
+  direction: Direction = Direction.NONE;
+  param: VirtualParam | null = null;
+  callUpdate: RangeUpdateCallback | null = null;
+  firstRangeTotalSize?: number;
+  firstRangeAverageSize: number = 0;
+  lastCalcIndex: number = 0;
+  fixedSizeValue?: number;
+  range: Range = { start: 0, end: 0, padFront: 0, padBehind: 0 };
 
-  constructor(param, callUpdate) {
+  constructor(param: VirtualParam, callUpdate: RangeUpdateCallback) {
     this.init(param, callUpdate);
   }
 
@@ -31,7 +39,7 @@ export default class Virtual {
    * @param {object} param - 参数对象
    * @param {function} callUpdate - 更新回调函数
    */
-  init(param, callUpdate) {
+  init(param: VirtualParam | null, callUpdate: RangeUpdateCallback | null): void {
     this.param = param;
     this.callUpdate = callUpdate;
 
@@ -45,14 +53,14 @@ export default class Virtual {
     this.offset = 0;
     this.direction = Direction.NONE;
 
-    this.range = Object.create(null);
+    this.range = { start: 0, end: 0, padFront: 0, padBehind: 0 };
     if (param) {
       this.checkRange(0, param.keeps - 1);
     }
   }
 
   // 销毁整个虚拟列表实例
-  destroy() {
+  destroy(): void {
     this.init(null, null);
   }
 
@@ -60,8 +68,8 @@ export default class Virtual {
    * 获取当前范围
    * @returns {object} - 当前范围对象
    */
-  getRange() {
-    const range = Object.create(null);
+  getRange(): Range {
+    const range = Object.create(null) as Range;
     range.start = this.range.start;
     range.end = this.range.end;
     range.padFront = this.range.padFront;
@@ -69,25 +77,26 @@ export default class Virtual {
     return range;
   }
 
-  isBehind() {
+  isBehind(): boolean {
     return this.direction === Direction.BEHIND;
   }
 
-  isFront() {
+  isFront(): boolean {
     return this.direction === Direction.FRONT;
   }
 
-  getOffset(start) {
-    return (start < 1 ? 0 : this.getIndexOffset(start)) + this.param.slotHeaderSize;
+  getOffset(start: number): number {
+    return (start < 1 ? 0 : this.getIndexOffset(start)) + (this.param?.slotHeaderSize ?? 0);
   }
 
   // 更新参数
-  updateParam(key, value) {
+  updateParam<K extends keyof VirtualParam>(key: K, value: VirtualParam[K]): void {
     if (this.param && key in this.param) {
       if (key === "uniqueIds") {
-        this.sizes.forEach((v, key) => {
-          if (!value.includes(key)) {
-            this.sizes.delete(key);
+        const nextUniqueIds = value as VirtualParam["uniqueIds"];
+        this.sizes.forEach((_v: number, currentKey: string) => {
+          if (!nextUniqueIds.includes(currentKey)) {
+            this.sizes.delete(currentKey);
           }
         });
       }
@@ -101,7 +110,7 @@ export default class Virtual {
    * @param {number} size - 尺寸
    * @description 该方法用于保存数据项的尺寸信息。将指定id和尺寸保存到`sizes`映射中，以便后续使用
    */
-  saveSize(id, size) {
+  saveSize(id: string, size: number): void {
     this.sizes.set(id, size);
 
     // 如果当前计算类型为初始化(INIT) 将尺寸值设为固定尺寸值，并将计算类型设置为固定
@@ -111,10 +120,10 @@ export default class Virtual {
       // 如果当前计算类型固定并且固定尺寸值不等于新的尺寸
     } else if (this.calcType === CalcType.FIXED && this.fixedSizeValue !== size) {
       this.calcType = CalcType.DYNAMIC;
-      delete this.fixedSizeValue; // 删除固定尺寸值
+      this.fixedSizeValue = undefined;
     }
 
-    if (this.calcType !== CalcType.FIXED && typeof this.firstRangeTotalSize !== "undefined") {
+    if (this.calcType !== CalcType.FIXED && typeof this.firstRangeTotalSize !== "undefined" && this.param) {
       // 如果sizes映射的大小小于参数keeps和uniqueIds长度的最小值 这么做的目的是为了计算平均尺寸
       if (this.sizes.size < Math.min(this.param.keeps, this.param.uniqueIds.length)) {
         // 第一个范围的总尺
@@ -122,7 +131,7 @@ export default class Virtual {
         // 第一个范围的平均尺寸
         this.firstRangeAverageSize = Math.round(this.firstRangeTotalSize / this.sizes.size);
       } else {
-        delete this.firstRangeTotalSize;
+        this.firstRangeTotalSize = undefined;
       }
     }
   }
@@ -130,7 +139,10 @@ export default class Virtual {
   /**
    * 数据变化处理
    */
-  handleDataSourcesChange() {
+  handleDataSourcesChange(): void {
+    if (!this.param) {
+      return;
+    }
     let start = this.range.start;
 
     if (this.isFront()) {
@@ -146,7 +158,7 @@ export default class Virtual {
     this.updateRange(this.range.start, this.getEndByStart(start));
   }
 
-  handleSlotSizeChange() {
+  handleSlotSizeChange(): void {
     this.handleDataSourcesChange();
   }
 
@@ -155,7 +167,7 @@ export default class Virtual {
    * @param offset 偏移量
    * @description 根据滚动的偏移量判断滚动的方向是向前还是向后
    */
-  handleScroll(offset) {
+  handleScroll(offset: number): void {
     this.direction = offset < this.offset ? Direction.FRONT : Direction.BEHIND;
     this.offset = offset;
 
@@ -174,7 +186,10 @@ export default class Virtual {
    * 向前滚动处理
    * @returns {number} 滚动的位置
    */
-  handleFront() {
+  handleFront(): void {
+    if (!this.param) {
+      return;
+    }
     const overs = this.getScrollOvers();
     if (overs > this.range.start) {
       return;
@@ -188,7 +203,10 @@ export default class Virtual {
    * 向后滚动处理
    * @returns {number} 滚动的位置
    */
-  handleBehind() {
+  handleBehind(): void {
+    if (!this.param) {
+      return;
+    }
     const overs = this.getScrollOvers();
     if (overs < this.range.start + this.param.buffer) {
       return;
@@ -201,14 +219,18 @@ export default class Virtual {
    * 获取滚动的位置
    * @returns {number} 滚动的位置
    */
-  getScrollOvers() {
+  getScrollOvers(): number {
+    if (!this.param) {
+      return 0;
+    }
     const offset = this.offset - this.param.slotHeaderSize;
     if (offset <= 0) {
       return 0;
     }
 
     if (this.isFixedType()) {
-      return Math.floor(offset / this.fixedSizeValue);
+      const fixedSize = this.fixedSizeValue ?? this.param.estimateSize;
+      return fixedSize > 0 ? Math.floor(offset / fixedSize) : 0;
     }
 
     let low = 0;
@@ -237,13 +259,16 @@ export default class Virtual {
    * @param {number} givenIndex - 给定的索引
    * @returns {number} - 偏移量
    */
-  getIndexOffset(givenIndex) {
+  getIndexOffset(givenIndex: number): number {
+    if (!this.param) {
+      return 0;
+    }
     if (!givenIndex) {
       return 0;
     }
 
     let offset = 0;
-    let indexSize = 0;
+    let indexSize: number | undefined = 0;
     for (let index = 0; index < givenIndex; index++) {
       indexSize = this.sizes.get(this.param.uniqueIds[index]);
       offset = offset + (typeof indexSize === "number" ? indexSize : this.getEstimateSize());
@@ -255,15 +280,18 @@ export default class Virtual {
     return offset;
   }
 
-  isFixedType() {
+  isFixedType(): boolean {
     return this.calcType === CalcType.FIXED;
   }
 
-  getLastIndex() {
-    return this.param.uniqueIds.length - 1;
+  getLastIndex(): number {
+    return this.param ? this.param.uniqueIds.length - 1 : 0;
   }
 
-  checkRange(start, end) {
+  checkRange(start: number, end: number): void {
+    if (!this.param) {
+      return;
+    }
     const keeps = this.param.keeps;
     const total = this.param.uniqueIds.length;
 
@@ -280,24 +308,27 @@ export default class Virtual {
   }
 
   // 更新范围
-  updateRange(start, end) {
+  updateRange(start: number, end: number): void {
     this.range.start = start;
     this.range.end = end;
     this.range.padFront = this.getPadFront();
     this.range.padBehind = this.getPadBehind();
-    this.callUpdate(this.getRange());
+    this.callUpdate?.(this.getRange());
   }
 
-  getEndByStart(start) {
+  getEndByStart(start: number): number {
+    if (!this.param) {
+      return 0;
+    }
     const theoryEnd = start + this.param.keeps - 1;
-    const truelyEnd = Math.min(theoryEnd, this.getLastIndex());
-    return truelyEnd;
+    const trueEnd = Math.min(theoryEnd, this.getLastIndex());
+    return trueEnd;
   }
 
   // 获取前方的预填充大小
-  getPadFront() {
+  getPadFront(): number {
     if (this.isFixedType()) {
-      return this.fixedSizeValue * this.range.start;
+      return (this.fixedSizeValue ?? 0) * this.range.start;
     } else {
       return this.getIndexOffset(this.range.start);
     }
@@ -307,13 +338,13 @@ export default class Virtual {
    * 获取后方的预填充大小
    * @returns {number} - 填充大小
    */
-  getPadBehind() {
+  getPadBehind(): number {
     const end = this.range.end; // 当前显示范围的结束索引
     const lastIndex = this.getLastIndex(); // 最后一个索引
 
     // 如果是固定尺寸类型就直接返回固定尺寸的填充大小
     if (this.isFixedType()) {
-      return (lastIndex - end) * this.fixedSizeValue;
+      return (lastIndex - end) * (this.fixedSizeValue ?? 0);
     }
 
     // 如果上一次计算的索引等于最后一个索引，则返回当前索引的偏移量减去结束索引的偏移量
@@ -325,9 +356,9 @@ export default class Virtual {
     }
   }
 
-  getEstimateSize() {
+  getEstimateSize(): number {
     return this.isFixedType()
-      ? this.fixedSizeValue
-      : this.firstRangeAverageSize || this.param.estimateSize;
+      ? (this.fixedSizeValue ?? this.param?.estimateSize ?? 0)
+      : this.firstRangeAverageSize || this.param?.estimateSize || 0;
   }
 }

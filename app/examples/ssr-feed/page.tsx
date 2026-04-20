@@ -1,6 +1,6 @@
-import { generateMockData, FeedItem } from "@/utils/mock";
-import FeedVirtualClient from "@/components/FeedVirtualClient";
-import { ExampleItem } from "@/components/ExampleItem";
+import { generateMockData, FeedItem } from "@/components/VirtualList/mock";
+import FeedVirtualClient from "@/components/VirtualList/FeedVirtualClient";
+import { ExampleItem } from "@/components/VirtualList/ExampleItem";
 
 export default async function SSRFeedPage() {
   const data: FeedItem[] = generateMockData(1000);
