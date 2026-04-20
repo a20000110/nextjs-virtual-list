@@ -1,9 +1,12 @@
 "use client";
 
 import VirtualList, { VirtualListRef } from "@/components/VirtualList";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { FeedItem } from "@/utils/mock";
 import { ExampleItem } from "@/components/ExampleItem";
+
+type VirtualListData = Record<string, unknown>;
+type VirtualListItemProps = Record<string, unknown>;
 
 export default function FeedVirtualClient({
   data,
@@ -16,7 +19,7 @@ export default function FeedVirtualClient({
 }) {
   const ref = useRef<VirtualListRef>(null);
   const [headerSize, setHeaderSize] = useState(0);
-  const rest = useMemo(() => data.slice(keeps), [data, keeps]);
+  const rest = useMemo<FeedItem[]>(() => data.slice(keeps), [data, keeps]);
 
   useEffect(() => {
     const el = document.getElementById(headerSelectorId);
@@ -38,9 +41,9 @@ export default function FeedVirtualClient({
   return (
     <VirtualList
       ref={ref}
-      data={rest}
+      data={rest as unknown as VirtualListData[]}
       dataKey="id"
-      item={ExampleItem}
+      item={ExampleItem as unknown as ComponentType<VirtualListItemProps>}
       keeps={keeps}
       size={100}
       pageMode

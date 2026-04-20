@@ -18,7 +18,7 @@ export const ExampleItem: React.FC<ExampleItemProps> = ({ source, index, fixedHe
     >
       <div className="flex items-start gap-3">
         {/* Avatar */}
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200 shadow-sm">
              <Image 
                src={source.author.avatar} 
