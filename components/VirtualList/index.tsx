@@ -18,23 +18,21 @@ interface Range {
   padBehind: number;
 }
 
-interface DataSource {
-  [key: string]: any;
-}
+type DataSource = Record<string, unknown>;
+type ItemComponentProps = Record<string, unknown>;
+type DataKey<T extends DataSource = DataSource> = keyof T | ((item: T) => string | number);
 
-type DataKey<T = any> = keyof T | ((item: T) => string | number);
-
-interface VirtualListProps<T = any> {
+interface VirtualListProps<T extends DataSource = DataSource> {
   data: T[];
   dataKey: DataKey<T>;
-  item: React.ComponentType<any> | ((props: Record<string, any>) => React.ReactNode);
+  item: React.ComponentType<ItemComponentProps>;
   keeps?: number;
   size?: number;
   start?: number;
   offset?: number;
   topThreshold?: number;
   bottomThreshold?: number;
-  itemProps?: Record<string, any>;
+  itemProps?: ItemComponentProps;
   dataPropName?: string;
   height?: number | string;
   pageMode?: boolean;
@@ -59,7 +57,7 @@ export interface VirtualListRef {
   scrollToIndex: (index: number, smooth?: boolean, topDistance?: number) => void;
 }
 
-const VirtualList = forwardRef<VirtualListRef, VirtualListProps>((props, ref) => {
+const VirtualList = forwardRef<VirtualListRef, VirtualListProps<DataSource>>((props, ref) => {
   /*
    * 组件概览（内部说明）
    *
@@ -182,21 +180,20 @@ const VirtualList = forwardRef<VirtualListRef, VirtualListProps>((props, ref) =>
   }, [emitEvent, getClientSize, getOffset, getScrollSize]);
 
   // 唯一键数组：用于尺寸映射与范围计算
-  const uniqueIds = useMemo(() => {
-    return data.map((dataSource: any) => {
-      const id =
-        typeof dataKey === "function" ? (dataKey as any)(dataSource) : dataSource[dataKey as any];
+  const uniqueIds = useMemo((): string[] => {
+    return data.map((dataSource: DataSource): string => {
+      const id = typeof dataKey === "function" ? dataKey(dataSource) : dataSource[dataKey];
       return String(id);
     });
   }, [data, dataKey]);
 
   // 范围更新回调：由 Virtual 通知组件渲染窗口更新
-  const onRangeChanged = useCallback((newRange: Range) => {
+  const onRangeChanged = useCallback((newRange: Range): void => {
     setRange(newRange);
   }, []);
 
   // 初始化 Virtual 实例：传入参数（包含 headerSize 等）并设置初始范围
-  const installVirtual = useCallback(() => {
+  const installVirtual = useCallback((): void => {
     virtual.current = new Virtual(
       {
         slotHeaderSize: headerSize,
@@ -343,17 +340,16 @@ const VirtualList = forwardRef<VirtualListRef, VirtualListProps>((props, ref) =>
   })); 
 
   // 根据范围渲染窗口内子项（其余由前后填充撑起滚动）
-  const renderSlots = useMemo(() => { 
+  const renderSlots = useMemo((): React.ReactNode[] | null => {
     if (!range) return null;
     const slots: React.ReactNode[] = [];
     const { start: s, end } = range;
     for (let index = s; index <= end; index++) {
-      const dataSource = data[index] as DataSource;
+      const dataSource = data[index] as DataSource | undefined;
       if (dataSource) {
-        const uniqueKey =
-          typeof dataKey === "function" ? (dataKey as any)(dataSource) : dataSource[dataKey as any];
+        const uniqueKey = typeof dataKey === "function" ? dataKey(dataSource) : dataSource[dataKey];
         if (typeof uniqueKey === "string" || typeof uniqueKey === "number") {
-          const Comp = item as any;
+          const Comp = item;
           slots.push(
             <VirtualItem
               key={String(uniqueKey)}
@@ -364,7 +360,7 @@ const VirtualList = forwardRef<VirtualListRef, VirtualListProps>((props, ref) =>
               dataPropsName={dataPropName}
               itemResize={onItemResized}
             >
-              {(p) => React.createElement(Comp, p)}
+              {(p): React.ReactNode => React.createElement(Comp, p)}
             </VirtualItem>
           );
         }

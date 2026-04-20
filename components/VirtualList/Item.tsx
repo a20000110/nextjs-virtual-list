@@ -7,24 +7,28 @@ import { ReactNode, useCallback, useEffect, useLayoutEffect, useRef } from "reac
  * - 支持不固定高度内容（文本/图片/视频/展开区域）
  */
 
-interface Props {
+type ItemExtraProps = Record<string, unknown>;
+
+interface Props<TSource extends Record<string, unknown> = Record<string, unknown>> {
   /** 当前项在数据源中的索引 */
   index: number;
   /** 当前项的数据对象 */
-  source: Record<string, any>;
+  source: TSource;
   /** 子项渲染函数/组件，接收合并后的 props */
-  children: (props: Record<string, any>) => ReactNode;
+  children: (props: ItemExtraProps) => ReactNode;
   /** 唯一键，用于尺寸映射与 React key */
   uniqueKey: string | number;
   /** 传递给子项的附加属性（例如样式/事件处理） */
-  itemProps?: Record<string, any>;
+  itemProps?: ItemExtraProps;
   /** 子项期望接收数据的 prop 名称，默认 'source' */
   dataPropsName?: string;
   /** 尺寸上报回调：当高度变化或初次渲染时调用 */
-  itemResize: (uniqueKey: Props["uniqueKey"], size: number) => void;
+  itemResize: (uniqueKey: Props<TSource>["uniqueKey"], size: number) => void;
 }
 
-export default function VirtualItem(props: Props) {
+export default function VirtualItem<TSource extends Record<string, unknown>>(
+  props: Props<TSource>
+): ReactNode {
   const {
     children,
     uniqueKey,
@@ -44,7 +48,7 @@ export default function VirtualItem(props: Props) {
    * 尺寸变化事件
    * @description: 通知父组件当前项的高度
    */
-  const dispatchSizeChange = useCallback(() => {
+  const dispatchSizeChange = useCallback((): void => {
     const size = rootRef.current ? rootRef.current.offsetHeight : 0; // 当前项的高度
     itemResize?.(uniqueKey, size);
   }, [uniqueKey, itemResize]);
@@ -52,7 +56,7 @@ export default function VirtualItem(props: Props) {
   useEffect(() => {
     if (typeof ResizeObserver !== "undefined") {
       // 监听元素尺寸变化
-      resizeObserver.current = new ResizeObserver(() => {
+      resizeObserver.current = new ResizeObserver((): void => {
         dispatchSizeChange();
       });
       // 创建观察者实例并传入回调函数
@@ -74,7 +78,7 @@ export default function VirtualItem(props: Props) {
     dispatchSizeChange();
   }, [dispatchSizeChange, index, source]);
 
-  const merged = {
+  const merged: ItemExtraProps = {
     ...itemProps,
     index,
     [dataPropsName]: source,
